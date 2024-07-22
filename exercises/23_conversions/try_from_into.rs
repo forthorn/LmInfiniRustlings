@@ -5,7 +5,11 @@
 // https://doc.rust-lang.org/std/convert/trait.TryFrom.html
 
 #![allow(clippy::useless_vec)]
-use std::convert::{TryFrom, TryInto};
+use std::{
+    collections::btree_map::Range,
+    convert::{TryFrom, TryInto},
+    error::Error,
+};
 
 #[derive(Debug, PartialEq)]
 struct Color {
@@ -28,14 +32,49 @@ enum IntoColorError {
 impl TryFrom<(i16, i16, i16)> for Color {
     type Error = IntoColorError;
 
-    fn try_from(tuple: (i16, i16, i16)) -> Result<Self, Self::Error> {}
+    fn try_from(tuple: (i16, i16, i16)) -> Result<Self, Self::Error> {
+        // u8::try_from(i16)
+        let check_range = |num: i16| -> Result<u8, IntoColorError> {
+            if num < 0 || num > 255 {
+                Err(IntoColorError::IntConversion)
+            } else {
+                Ok(num as u8)
+            }
+        };
+        let (Ok(red), Ok(green), Ok(blue)) = (
+            check_range(tuple.0),
+            check_range(tuple.1),
+            check_range(tuple.2),
+        ) else {
+            return Err(IntoColorError::IntConversion);
+        };
+        Ok(Self { red, green, blue })
+    }
 }
 
 // TODO: Array implementation.
 impl TryFrom<[i16; 3]> for Color {
     type Error = IntoColorError;
 
-    fn try_from(arr: [i16; 3]) -> Result<Self, Self::Error> {}
+    fn try_from(arr: [i16; 3]) -> Result<Self, Self::Error> {
+        let results: Vec<Result<u8, IntoColorError>> = arr
+            .into_iter()
+            .map(|num| {
+                if num < 0 || num > 255 {
+                    Err(IntoColorError::IntConversion)
+                } else {
+                    Ok(num as u8)
+                }
+            })
+            .collect();
+        let mut result_iter = results.into_iter();
+        let (Some(Ok(red)), Some(Ok(green)), Some(Ok(blue))) =
+            (result_iter.next(), result_iter.next(), result_iter.next())
+        else {
+            return Err(IntoColorError::IntConversion);
+        };
+        Ok(Self { red, green, blue })
+    }
 }
 
 // TODO: Slice implementation.
@@ -43,7 +82,28 @@ impl TryFrom<[i16; 3]> for Color {
 impl TryFrom<&[i16]> for Color {
     type Error = IntoColorError;
 
-    fn try_from(slice: &[i16]) -> Result<Self, Self::Error> {}
+    fn try_from(slice: &[i16]) -> Result<Self, Self::Error> {
+        if slice.len() != 3 {
+            return Err(IntoColorError::BadLen);
+        }
+        let results: Vec<Result<u8, IntoColorError>> = slice
+            .into_iter()
+            .map(|&num| {
+                if num < 0 || num > 255 {
+                    Err(IntoColorError::IntConversion)
+                } else {
+                    Ok(num as u8)
+                }
+            })
+            .collect();
+        let mut result_iter = results.into_iter();
+        let (Some(Ok(red)), Some(Ok(green)), Some(Ok(blue))) =
+            (result_iter.next(), result_iter.next(), result_iter.next())
+        else {
+            return Err(IntoColorError::IntConversion);
+        };
+        Ok(Self { red, green, blue })
+    }
 }
 
 fn main() {
